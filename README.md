@@ -1,39 +1,33 @@
-# Segurança Pública Inteligente em São Paulo: Classificação de Ocorrências com MLP
+# Classificação de Ocorrências Policiais em São Paulo com MLP
 
-Projeto desenvolvido para a **Global Solution** da disciplina de *Aprendizado Profundo com Redes Neurais Convolucionais* (FIAP).
+Projeto da Global Solution — Aprendizado Profundo com Redes Neurais Convolucionais (FIAP).
 
-## 🌐 Acesso à Aplicação Web
-Acesse a aplicação em funcionamento: [https://gs-mlp-seguranca-sp-qsit7kr2bcmqrtbddayvyi.streamlit.app/](https://gs-mlp-seguranca-sp-qsit7kr2bcmqrtbddayvyi.streamlit.app/)
+**Aplicação rodando no Streamlit:** https://gs-mlp-seguranca-sp-qsit7kr2bcmqrtbddayvyi.streamlit.app/
 
----
+## Sobre o projeto
+O objetivo aqui foi treinar e comparar três arquiteturas diferentes de redes neurais Multilayer Perceptron (MLP) para classificar ocorrências registradas na capital de São Paulo entre **Roubo (1)** e **Furto (0)**. 
 
-## 1. Objetivo do Projeto
-Desenvolver, treinar e comparar três arquiteturas de redes neurais **Multilayer Perceptron (MLP)** para classificar ocorrências policiais registradas na capital de São Paulo entre **Roubo (1)** e **Furto (0)**. 
+Vale destacar que o modelo não prevê se um crime vai acontecer no futuro. Ele analisa as características de uma ocorrência (já registrada ou simulada no formulário) para indicar se o padrão daquele registro bate mais com roubo ou furto.
 
-⚠️ *Nota metodológica:* O modelo analisa o perfil e as características contextuais de uma ocorrência (registrada ou hipotética) para estimar a sua compatibilidade com roubo ou furto, e não o risco futuro de um crime acontecer.
+## Base de dados e pré-processamento
+Os dados vieram da base pública de celulares subtraídos da Secretaria da Segurança Pública de São Paulo (SSP-SP), referente ao ano de 2026 (`CelularesSubtraidos_2026.xlsx`, aba `CELULAR_2026`)[cite: 16].
 
-## 2. Fonte de Dados e Tratamento
-* **Fonte Pública:** Secretaria da Segurança Pública do Estado de São Paulo (SSP-SP) – Portal de Estatísticas[cite: 16].
-* **Base Utilizada:** `CelularesSubtraidos_2026.xlsx` (Aba `CELULAR_2026`).
-* **Recorte e Amostragem:** 
-  * Filtragem restrita ao município de São Paulo (Capital), resultando em 151.170 registros.
-  * Tratamento de duplicidades por Boletim de Ocorrência, totalizando 130.851 BOs únicos.
-  * Amostra balanceada de **18.000 observações** (65,04% Furto / 34,96% Roubo), dividida em Treino (70% / 12.600), Validação (15% / 2.700) e Teste (15% / 2.700).
-* **Atributos de Entrada ($X$):** `BAIRRO_AGRUPADO`, `PERIODO_DIA`, `DIA_SEMANA`, `TIPOLOCAL_AGRUPADO`, `HORA_NUM` e `FIM_DE_SEMANA` (totalizando 53 features após *OneHotEncoding* e *StandardScaler*). Variáveis que revelavam a natureza da infração foram estritamente excluídas para evitar *data leakage*[cite: 17].
+* **Filtragem e limpeza:** Dos 256.076 registros originais, separei apenas os ocorridos no município de São Paulo (151.170) e removi boletins duplicados, chegando a 130.851 ocorrências únicas[cite: 16].
+* **Amostra:** Para viabilizar o treino, utilizei um recorte de **18.000 registros** (65,04% de furto e 34,96% de roubo), divididos em 70% para treino (12.600), 15% para validação (2.700) e 15% para teste (2.700).
+* **Features:** Usei `BAIRRO_AGRUPADO`, `PERIODO_DIA`, `DIA_SEMANA`, `TIPOLOCAL_AGRUPADO`, `HORA_NUM` e `FIM_DE_SEMANA`. Depois do *OneHotEncoding* e do *StandardScaler*, ficaram 53 entradas[cite: 17]. Colunas como `RUBRICA` e `DESC_LEI` foram cortadas antes do treino para não vazar a resposta para a rede (*data leakage*)[cite: 17].
 
-## 3. Comparação de Arquiteturas (Conjunto de Validação)
+## Resultados dos experimentos (Validação)
 
-| Arquitetura | Camadas Ocultas | Ajustes e Regularização | Acurácia | Precision | Recall | F1-Score |
+| Arquitetura | Camadas Ocultas | Ajustes | Acurácia | Precision | Recall | F1-Score |
 | :--- | :--- | :--- | :---: | :---: | :---: | :---: |
-| **Arquitetura 2 (Vencedora)** | 3 (128 - 64 - 32, ReLU) | EarlyStopping + ClassWeight | **0.6904** | 0.5493 | 0.6377 | **0.5902** |
+| **Arquitetura 2 (Escolhida)** | 3 (128 - 64 - 32, ReLU) | EarlyStopping + ClassWeight | **0.6904** | 0.5493 | 0.6377 | **0.5902** |
 | **Arquitetura 1 (Baseline)** | 1 (32, ReLU) | EarlyStopping + ClassWeight | 0.6841 | 0.5402 | 0.6472 | 0.5889 |
 | **Arquitetura 3 (Regularizada)** | 2 (64 - 32, ReLU) | Dropout (0.3/0.2) + L2 + BatchNorm | 0.6781 | 0.6904 | 0.1441 | 0.2384 |
 
-* **Desempenho Final no Conjunto de Teste (2.700 amostras):** Acurácia = **69,81%** | Precision = **56,04%** | Recall = **63,35%** | F1-Score = **0,5947**.
+A **Arquitetura 2** teve o melhor equilíbrio entre *precision* e *recall* na validação e foi escolhida para ir para a aplicação web[cite: 17]. Rodando ela no conjunto de teste final (2.700 registros), os números foram: **69,81% de acurácia**, **56,04% de precision**, **63,35% de recall** e **0,5947 de F1-score**.
 
-## 4. Como Executar Localmente
-Para rodar o projeto na sua máquina:
+## Como rodar na sua máquina
 
-1. Clone o repositório e instale as dependências:
-   ```bash
-   pip install -r requirements.txt
+Instale as dependências:
+```bash
+pip install -r requirements.txt
