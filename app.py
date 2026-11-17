@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import joblib
 from tensorflow import keras
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.compose import ColumnTransformer
@@ -17,8 +16,8 @@ def carregar_modelo_e_dados():
     bairros = [
         'OUTROS BAIRROS', 'SANTA CECILIA', 'LIBERDADE', 'BELA VISTA', 'CONSOLACAO', 
         'REPUBLICA', 'PERDIZES', 'PINHEIROS', 'MOEMA', 'ITAIM BIBI', 'VILA MARIANA', 
-        'SAO PAULO', 'BARRA FUNDA', 'CENTRO', 'JARDIM PAULISTA', 'AMOINHA', 'MOOCA', 
-        'IPIRANGA', 'SANTANA', 'TUCURUVI', 'LAPA', 'BUTANTA', 'CAMPO BELO', 'ITAQUERA', 'PINHEIROS'
+        'SAO PAULO', 'BARRA FUNDA', 'CENTRO', 'JARDIM PAULISTA', 'MOOCA', 
+        'IPIRANGA', 'SANTANA', 'TUCURUVI', 'LAPA', 'BUTANTA', 'CAMPO BELO', 'ITAQUERA'
     ]
     periodos = ['A NOITE', 'A TARDE', 'DE MADRUGADA', 'EM HORA INCERTA', 'PELA MANHÃ']
     dias_semana = ['Segunda-feira', 'Terca-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sabado', 'Domingo']
@@ -95,6 +94,19 @@ if submetido:
     }])
     
     X_input_proc = preprocessador.transform(df_input)
+    
+    # Alinhamento automático de dimensões com o modelo treinado
+    expected_features = modelo.input_shape[1]
+    if hasattr(X_input_proc, "toarray"):
+        X_input_proc = X_input_proc.toarray()
+        
+    if X_input_proc.shape[1] < expected_features:
+        X_padded = np.zeros((X_input_proc.shape[0], expected_features))
+        X_padded[:, :X_input_proc.shape[1]] = X_input_proc
+        X_input_proc = X_padded
+    elif X_input_proc.shape[1] > expected_features:
+        X_input_proc = X_input_proc[:, :expected_features]
+
     prob_roubo = float(modelo.predict(X_input_proc, verbose=0)[0][0])
     prob_furto = 1.0 - prob_roubo
     
