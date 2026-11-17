@@ -3,7 +3,7 @@
 Projeto desenvolvido para a Global Solution da disciplina Aprendizado Profundo com Redes Neurais Convolucionais (FIAP).
 
 ## Link da Aplicação Web Funcional
-Acesse a Aplicação Web aqui: [COLE_AQUI_O_LINK_DO_STREAMLIT]
+Acesse a Aplicação Web aqui: https://gs-mlp-seguranca-sp-qsit7kr2bcmqrtbddayvyi.streamlit.app/
 
 ## 1. Objetivo do Projeto
 Construir, treinar, avaliar e comparar três arquiteturas de redes neurais Multilayer Perceptron (MLP) para classificar ocorrências policiais registradas na cidade de São Paulo entre Roubo (1) e Furto (0). O modelo analisa uma ocorrência registrada ou hipotética e estima sua compatibilidade com roubo ou furto, sem prever o risco futuro de um crime acontecer.
