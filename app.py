@@ -1,8 +1,9 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import joblib
 from tensorflow import keras
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
+from sklearn.compose import ColumnTransformer
 
 st.set_page_config(page_title="Classificador SSP-SP | MLP", page_icon="🚓", layout="centered")
 
@@ -28,13 +29,65 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 @st.cache_resource
-def carregar_modelo_e_artefatos():
+def carregar_modelo_e_preprocessador():
     modelo = keras.models.load_model("modelo_mlp_sp.keras")
-    artefatos = joblib.load("artefatos_web.pkl")
-    return modelo, artefatos
+    
+    # Categorias exatas extraídas do artefatos_web.pkl (ordem alfabética exata das 51 colunas One-Hot do treino)
+    bairros = [
+        'BARRA FUNDA', 'BELA VISTA', 'BOM RETIRO', 'BRÁS', 'CAPAO REDONDO',
+        'CENTRO', 'CENTRO HISTÓRICO DE SÃO PAULO', 'CONSOLACAO', 'CONSOLAÇÃO',
+        'IPIRANGA', 'ITAIM BIBI', 'ITAQUERA', 'JARDIM PAULISTA', 'LAPA',
+        'LIBERDADE', 'MOOCA', 'OUTROS BAIRROS', 'PINHEIROS', 'REPUBLICA',
+        'REPÚBLICA', 'SANTA CECILIA', 'SANTANA', 'SANTO AMARO', 'TATUAPÉ',
+        'VILA GUILHERME', 'VILA MARIANA'
+    ]
+    periodos = ['A NOITE', 'A TARDE', 'DE MADRUGADA', 'EM HORA INCERTA', 'PELA MANHÃ']
+    dias_treino = ['DOMINGO', 'QUARTA-FEIRA', 'QUINTA-FEIRA', 'SABADO', 'SEGUNDA-FEIRA', 'SEXTA-FEIRA', 'TERCA-FEIRA']
+    dias_exibicao = ['Segunda-feira', 'Terca-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sabado', 'Domingo']
+    tipos_local = [
+        'CENTRO COMERCIAL/EMPRESARIAL', 'COMÉRCIO E SERVIÇOS', 'ESTACIONAMENTO/GARAGEM',
+        'LAZER E RECREAÇÃO', 'OUTROS', 'OUTROS LOCAIS', 'RESIDÊNCIA',
+        'RESTAURANTE E AFINS', 'RODOVIA/ESTRADA', 'SAÚDE', 'SHOPPING CENTER',
+        'TERMINAL/ESTAÇÃO', 'VIA PÚBLICA'
+    ]
+    
+    features_categoricas = ['BAIRRO_AGRUPADO', 'PERIODO_DIA', 'DIA_SEMANA', 'TIPOLOCAL_AGRUPADO']
+    features_numericas = ['HORA_NUM', 'FIM_DE_SEMANA']
+    
+    # Reconstrói o OneHotEncoder exatamente com as 51 categorias do treino
+    ohe = OneHotEncoder(
+        categories=[bairros, periodos, dias_treino, tipos_local],
+        handle_unknown='ignore',
+        sparse_output=False
+    )
+    scaler = StandardScaler()
+    
+    preprocessador = ColumnTransformer(transformers=[
+        ('cat', ohe, features_categoricas),
+        ('num', scaler, features_numericas)
+    ])
+    
+    # Inicializa a estrutura do ColumnTransformer
+    df_init = pd.DataFrame([{
+        'BAIRRO_AGRUPADO': bairros[0],
+        'PERIODO_DIA': periodos[0],
+        'DIA_SEMANA': dias_treino[0],
+        'TIPOLOCAL_AGRUPADO': tipos_local[0],
+        'HORA_NUM': 14.0,
+        'FIM_DE_SEMANA': 0
+    }])
+    preprocessador.fit(df_init)
+    
+    # Injeta os parâmetros estatísticos exatos do conjunto de treino (12.600 amostras) extraídos do artefatos_web.pkl
+    scaler_ajustado = preprocessador.named_transformers_['num']
+    scaler_ajustado.mean_ = np.array([13.48936508, 0.28738095])
+    scaler_ajustado.var_ = np.array([37.79822937, 0.20479317])
+    scaler_ajustado.scale_ = np.array([6.14802646, 0.45254079])
+    scaler_ajustado.n_samples_seen_ = 12600
+    
+    return modelo, preprocessador, bairros, periodos, dias_exibicao, tipos_local
 
-modelo, artefatos = carregar_modelo_e_artefatos()
-preprocessador = artefatos["preprocessador"]
+modelo, preprocessador, bairros, periodos, dias_semana, tipos_local = carregar_modelo_e_preprocessador()
 
 # Cabeçalho em linha única e texto logo abaixo seguindo o alinhamento
 st.markdown('<div class="titulo-linha-unica">🚓 Classificação Inteligente de Ocorrências em São Paulo (MLP)</div>', unsafe_allow_html=True)
@@ -49,19 +102,18 @@ with st.form("form_ocorrencia"):
     col1, col2 = st.columns(2)
     
     with col1:
-        bairro = st.selectbox("Bairro da Ocorrência (SP Capital)", options=artefatos["bairros"])
-        periodo = st.selectbox("Período do Dia", options=artefatos["periodos"])
-        dia_semana = st.selectbox("Dia da Semana", options=artefatos["dias_semana"])
+        bairro = st.selectbox("Bairro da Ocorrência (SP Capital)", options=bairros)
+        periodo = st.selectbox("Período do Dia", options=periodos)
+        dia_semana = st.selectbox("Dia da Semana", options=dias_semana)
         
     with col2:
-        tipo_local = st.selectbox("Tipo de Local", options=artefatos["tipos_local"])
+        tipo_local = st.selectbox("Tipo de Local", options=tipos_local)
         hora_num = st.slider("Hora Aproximada da Ocorrência (0h às 23h)", min_value=0, max_value=23, value=19)
     
     submetido = st.form_submit_button("🔍 Classificar Ocorrência", use_container_width=True)
 
 # Resultado da pesquisa aparece logo abaixo do formulário (e acima da nota do rodapé)
 if submetido:
-    # Normaliza a string para maiúsculas para bater com o formato salvo no treino ("SABADO", "DOMINGO")
     fim_de_semana = 1 if str(dia_semana).upper() in ["SABADO", "DOMINGO", "SÁBADO"] else 0
     
     df_input = pd.DataFrame([{
@@ -73,7 +125,7 @@ if submetido:
         "FIM_DE_SEMANA": int(fim_de_semana)
     }])
     
-    # Transforma os dados usando exatamente o pipeline ajustado no conjunto de treino (53 features exatas)
+    # Transforma gerando exatamente as 53 features alinhadas com a rede MLP
     X_input_proc = preprocessador.transform(df_input)
     
     prob_roubo = float(modelo.predict(X_input_proc, verbose=0)[0][0])
