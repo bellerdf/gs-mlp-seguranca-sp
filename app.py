@@ -14,7 +14,6 @@ st.set_page_config(page_title="Classificador SSP-SP | MLP", page_icon="🚓", la
 def carregar_modelo_e_dados():
     modelo = keras.models.load_model('modelo_mlp_sp.keras')
     
-    # Listas oficiais extraídas da base de dados da SSP-SP para o aplicativo funcionar perfeitamente
     bairros = [
         'OUTROS BAIRROS', 'SANTA CECILIA', 'LIBERDADE', 'BELA VISTA', 'CONSOLACAO', 
         'REPUBLICA', 'PERDIZES', 'PINHEIROS', 'MOEMA', 'ITAIM BIBI', 'VILA MARIANA', 
@@ -28,7 +27,6 @@ def carregar_modelo_e_dados():
         'Outros', 'Terminal de Ônibus', 'Estação de Metrô', 'Rodovia', 'Estacionamento'
     ]
     
-    # Recriar o ColumnTransformer idêntico ao do treino para evitar qualquer erro de versão do pickle
     features_categoricas = ['BAIRRO_AGRUPADO', 'PERIODO_DIA', 'DIA_SEMANA', 'TIPOLOCAL_AGRUPADO']
     features_numericas = ['HORA_NUM', 'FIM_DE_SEMANA']
     
@@ -47,19 +45,15 @@ def carregar_modelo_e_dados():
         ('num', transformador_num, features_numericas)
     ])
     
-    # Ajustar com categorias bases fictícias para inicializar o OneHotEncoder sem precisar do .pkl
-import pandas as pd
-import numpy as np
-
-# Dados mínimos de ajuste para o preprocessador estruturar as 53 features da MLP
-df_dummy = pd.DataFrame({
-    'BAIRRO_AGRUPADO': bairros,
-    'PERIODO_DIA': [periodos[0]] * len(bairros),
-    'DIA_SEMANA': [dias_semana[0]] * len(bairros),
-    'TIPOLOCAL_AGRUPADO': [tipos_local[0]] * len(bairros),
-    'HORA_NUM': [12.0] * len(bairros),
-    'FIM_DE_SEMANA': [0] * len(bairros)
-})
+    df_dummy = pd.DataFrame({
+        'BAIRRO_AGRUPADO': bairros,
+        'PERIODO_DIA': [periodos[0]] * len(bairros),
+        'DIA_SEMANA': [dias_semana[0]] * len(bairros),
+        'TIPOLOCAL_AGRUPADO': [tipos_local[0]] * len(bairros),
+        'HORA_NUM': [12.0] * len(bairros),
+        'FIM_DE_SEMANA': [0] * len(bairros)
+    })
+    
     preprocessador.fit(df_dummy)
     
     return modelo, preprocessador, bairros, periodos, dias_semana, tipos_local
@@ -69,7 +63,7 @@ modelo, preprocessador, bairros, periodos, dias_semana, tipos_local = carregar_m
 st.title("🚓 Classificação Inteligente de Ocorrências em São Paulo (MLP)")
 st.markdown(
     "Esta aplicação utiliza uma rede neural **Multilayer Perceptron (MLP)** treinada com dados públicos da **SSP-SP (Celulares Subtraídos - 2026)** "
-    "para classificar se as características de uma ocorrência registrada na capital paulista são mais compatíveis com **Furto** ou **Roubo**."
+    "para classificar se as características de uma ocorrência registada na capital paulista são mais compatíveis com **Furto** ou **Roubo**."
 )
 st.info("⚠️ **Nota metodológica:** O modelo analisa o perfil de uma ocorrência e estima a compatibilidade com a natureza criminal (roubo vs. furto).")
 
