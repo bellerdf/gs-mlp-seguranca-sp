@@ -1,11 +1,8 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+import joblib
 from tensorflow import keras
-from sklearn.preprocessing import OneHotEncoder, StandardScaler
-from sklearn.compose import ColumnTransformer
-from sklearn.pipeline import Pipeline
-from sklearn.impute import SimpleImputer
 
 st.set_page_config(page_title="Classificador SSP-SP | MLP", page_icon="🚓", layout="centered")
 
@@ -31,54 +28,13 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 @st.cache_resource
-def carregar_modelo_e_dados():
-    modelo = keras.models.load_model('modelo_mlp_sp.keras')
-    
-    bairros = [
-        'OUTROS BAIRROS', 'SANTA CECILIA', 'LIBERDADE', 'BELA VISTA', 'CONSOLACAO', 
-        'REPUBLICA', 'PERDIZES', 'PINHEIROS', 'MOEMA', 'ITAIM BIBI', 'VILA MARIANA', 
-        'SAO PAULO', 'BARRA FUNDA', 'CENTRO', 'JARDIM PAULISTA', 'MOOCA', 
-        'IPIRANGA', 'SANTANA', 'TUCURUVI', 'LAPA', 'BUTANTA', 'CAMPO BELO', 'ITAQUERA'
-    ]
-    periodos = ['A NOITE', 'A TARDE', 'DE MADRUGADA', 'EM HORA INCERTA', 'PELA MANHÃ']
-    dias_semana = ['Segunda-feira', 'Terca-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sabado', 'Domingo']
-    tipos_local = [
-        'Via Pública', 'Residência', 'Comércio', 'Estabelecimento Comercial', 
-        'Outros', 'Terminal de Ônibus', 'Estação de Metrô', 'Rodovia', 'Estacionamento'
-    ]
-    
-    features_categoricas = ['BAIRRO_AGRUPADO', 'PERIODO_DIA', 'DIA_SEMANA', 'TIPOLOCAL_AGRUPADO']
-    features_numericas = ['HORA_NUM', 'FIM_DE_SEMANA']
-    
-    transformador_cat = Pipeline(steps=[
-        ('imputer', SimpleImputer(strategy='most_frequent')),
-        ('onehot', OneHotEncoder(handle_unknown='ignore', sparse_output=False))
-    ])
-    
-    transformador_num = Pipeline(steps=[
-        ('imputer', SimpleImputer(strategy='median')),
-        ('scaler', StandardScaler())
-    ])
-    
-    preprocessador = ColumnTransformer(transformers=[
-        ('cat', transformador_cat, features_categoricas),
-        ('num', transformador_num, features_numericas)
-    ])
-    
-    df_dummy = pd.DataFrame({
-        'BAIRRO_AGRUPADO': bairros,
-        'PERIODO_DIA': [periodos[0]] * len(bairros),
-        'DIA_SEMANA': [dias_semana[0]] * len(bairros),
-        'TIPOLOCAL_AGRUPADO': [tipos_local[0]] * len(bairros),
-        'HORA_NUM': [12.0] * len(bairros),
-        'FIM_DE_SEMANA': [0] * len(bairros)
-    })
-    
-    preprocessador.fit(df_dummy)
-    
-    return modelo, preprocessador, bairros, periodos, dias_semana, tipos_local
+def carregar_modelo_e_artefatos():
+    modelo = keras.models.load_model("modelo_mlp_sp.keras")
+    artefatos = joblib.load("artefatos_web.pkl")
+    return modelo, artefatos
 
-modelo, preprocessador, bairros, periodos, dias_semana, tipos_local = carregar_modelo_e_dados()
+modelo, artefatos = carregar_modelo_e_artefatos()
+preprocessador = artefatos["preprocessador"]
 
 # Cabeçalho em linha única e texto logo abaixo seguindo o alinhamento
 st.markdown('<div class="titulo-linha-unica">🚓 Classificação Inteligente de Ocorrências em São Paulo (MLP)</div>', unsafe_allow_html=True)
@@ -93,42 +49,33 @@ with st.form("form_ocorrencia"):
     col1, col2 = st.columns(2)
     
     with col1:
-        bairro = st.selectbox("Bairro da Ocorrência (SP Capital)", options=bairros)
-        periodo = st.selectbox("Período do Dia", options=periodos)
-        dia_semana = st.selectbox("Dia da Semana", options=dias_semana)
+        bairro = st.selectbox("Bairro da Ocorrência (SP Capital)", options=artefatos["bairros"])
+        periodo = st.selectbox("Período do Dia", options=artefatos["periodos"])
+        dia_semana = st.selectbox("Dia da Semana", options=artefatos["dias_semana"])
         
     with col2:
-        tipo_local = st.selectbox("Tipo de Local", options=tipos_local)
+        tipo_local = st.selectbox("Tipo de Local", options=artefatos["tipos_local"])
         hora_num = st.slider("Hora Aproximada da Ocorrência (0h às 23h)", min_value=0, max_value=23, value=19)
     
     submetido = st.form_submit_button("🔍 Classificar Ocorrência", use_container_width=True)
 
 # Resultado da pesquisa aparece logo abaixo do formulário (e acima da nota do rodapé)
 if submetido:
-    fim_de_semana = 1 if dia_semana in ['SABADO', 'DOMINGO', 'Sabado', 'Domingo'] else 0
+    # Normaliza a string para maiúsculas para bater com o formato salvo no treino ("SABADO", "DOMINGO")
+    fim_de_semana = 1 if str(dia_semana).upper() in ["SABADO", "DOMINGO", "SÁBADO"] else 0
     
     df_input = pd.DataFrame([{
-        'BAIRRO_AGRUPADO': bairro,
-        'PERIODO_DIA': periodo,
-        'DIA_SEMANA': dia_semana,
-        'TIPOLOCAL_AGRUPADO': tipo_local,
-        'HORA_NUM': float(hora_num),
-        'FIM_DE_SEMANA': int(fim_de_semana)
+        "BAIRRO_AGRUPADO": bairro,
+        "PERIODO_DIA": periodo,
+        "DIA_SEMANA": str(dia_semana).upper(),
+        "TIPOLOCAL_AGRUPADO": tipo_local,
+        "HORA_NUM": float(hora_num),
+        "FIM_DE_SEMANA": int(fim_de_semana)
     }])
     
+    # Transforma os dados usando exatamente o pipeline ajustado no conjunto de treino (53 features exatas)
     X_input_proc = preprocessador.transform(df_input)
     
-    expected_features = modelo.input_shape[1]
-    if hasattr(X_input_proc, "toarray"):
-        X_input_proc = X_input_proc.toarray()
-        
-    if X_input_proc.shape[1] < expected_features:
-        X_padded = np.zeros((X_input_proc.shape[0], expected_features))
-        X_padded[:, :X_input_proc.shape[1]] = X_input_proc
-        X_input_proc = X_padded
-    elif X_input_proc.shape[1] > expected_features:
-        X_input_proc = X_input_proc[:, :expected_features]
-
     prob_roubo = float(modelo.predict(X_input_proc, verbose=0)[0][0])
     prob_furto = 1.0 - prob_roubo
     
@@ -142,7 +89,12 @@ if submetido:
     c2.metric("Probabilidade atribuída a FURTO", f"{prob_furto * 100:.1f}%")
     
     st.progress(prob_roubo, text=f"Escala de Compatibilidade: Furto ({prob_furto*100:.1f}%) ➔ Roubo ({prob_roubo*100:.1f}%)")
+    st.caption(
+        f"**Interpretação correta:** Considerando que uma ocorrência aconteceu em **{bairro}** ({tipo_local}), "
+        f"na **{dia_semana}** ({periodo}, ~{hora_num}h), a rede MLP atribui **{prob_roubo*100:.1f}%** de probabilidade "
+        f"à classe Roubo e **{prob_furto*100:.1f}%** à classe Furto."
+    )
 
 # Rodapé fixo no final da página (sempre abaixo dos resultados)
 st.write("")
-st.info("⚠️ **Nota metodológica:** O modelo analisa o perfil de uma ocorrência e estima a compatibilidade com a natureza criminal (roubo vs. furto).")
+st.info("⚠️ **Nota metodológica:** O modelo analisa o perfil de uma ocorrência que já aconteceu (ou hipotética) e estima a compatibilidade com a natureza criminal (roubo vs. furto). Ele não prevê o risco de um crime futuro ocorrer.")
