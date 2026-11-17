@@ -9,6 +9,27 @@ from sklearn.impute import SimpleImputer
 
 st.set_page_config(page_title="Classificador SSP-SP | MLP", page_icon="🚓", layout="centered")
 
+# Ajuste visual para deixar o título em uma única linha e o layout mais fluido
+st.markdown("""
+    <style>
+    .block-container {
+        max-width: 860px;
+        padding-top: 2.5rem;
+    }
+    .titulo-linha-unica {
+        font-size: 1.75rem;
+        font-weight: 700;
+        white-space: nowrap;
+        margin-bottom: 0.4rem;
+    }
+    .subtitulo-fluido {
+        font-size: 0.98rem;
+        color: #4a4a4a;
+        margin-bottom: 1.8rem;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
 @st.cache_resource
 def carregar_modelo_e_dados():
     modelo = keras.models.load_model('modelo_mlp_sp.keras')
@@ -59,12 +80,13 @@ def carregar_modelo_e_dados():
 
 modelo, preprocessador, bairros, periodos, dias_semana, tipos_local = carregar_modelo_e_dados()
 
-st.title("🚓 Classificação Inteligente de Ocorrências em São Paulo (MLP)")
+# Cabeçalho em linha única e texto logo abaixo seguindo o alinhamento
+st.markdown('<div class="titulo-linha-unica">🚓 Classificação Inteligente de Ocorrências em São Paulo (MLP)</div>', unsafe_allow_html=True)
 st.markdown(
-    "Esta aplicação utiliza uma rede neural **Multilayer Perceptron (MLP)** treinada com dados públicos da **SSP-SP (Celulares Subtraídos - 2026)** "
-    "para classificar se as características de uma ocorrência registada na capital paulista são mais compatíveis com **Furto** ou **Roubo**."
+    '<div class="subtitulo-fluido">Esta aplicação utiliza uma rede neural <b>Multilayer Perceptron (MLP)</b> treinada com dados públicos da '
+    '<b>SSP-SP (Celulares Subtraídos - 2026)</b> para classificar se as características de uma ocorrência registrada na capital paulista são mais compatíveis com <b>Furto</b> ou <b>Roubo</b>.</div>',
+    unsafe_allow_html=True
 )
-st.info("⚠️ **Nota metodológica:** O modelo analisa o perfil de uma ocorrência e estima a compatibilidade com a natureza criminal (roubo vs. furto).")
 
 with st.form("form_ocorrencia"):
     st.subheader("Informe as características da ocorrência")
@@ -81,6 +103,7 @@ with st.form("form_ocorrencia"):
     
     submetido = st.form_submit_button("🔍 Classificar Ocorrência", use_container_width=True)
 
+# Resultado da pesquisa aparece logo abaixo do formulário (e acima da nota do rodapé)
 if submetido:
     fim_de_semana = 1 if dia_semana in ['SABADO', 'DOMINGO', 'Sabado', 'Domingo'] else 0
     
@@ -95,7 +118,6 @@ if submetido:
     
     X_input_proc = preprocessador.transform(df_input)
     
-    # Alinhamento automático de dimensões com o modelo treinado
     expected_features = modelo.input_shape[1]
     if hasattr(X_input_proc, "toarray"):
         X_input_proc = X_input_proc.toarray()
@@ -120,3 +142,7 @@ if submetido:
     c2.metric("Probabilidade atribuída a FURTO", f"{prob_furto * 100:.1f}%")
     
     st.progress(prob_roubo, text=f"Escala de Compatibilidade: Furto ({prob_furto*100:.1f}%) ➔ Roubo ({prob_roubo*100:.1f}%)")
+
+# Rodapé fixo no final da página (sempre abaixo dos resultados)
+st.write("")
+st.info("⚠️ **Nota metodológica:** O modelo analisa o perfil de uma ocorrência e estima a compatibilidade com a natureza criminal (roubo vs. furto).")
