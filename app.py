@@ -1,152 +1,50 @@
-import streamlit as st
-import pandas as pd
-import numpy as np
-from tensorflow import keras
-from sklearn.preprocessing import OneHotEncoder, StandardScaler
-from sklearn.compose import ColumnTransformer
+# Classificação de Ocorrências Policiais em São Paulo com MLP
 
-st.set_page_config(page_title="Classificador SSP-SP | MLP", page_icon="🚓", layout="centered")
+Projeto da Global Solution — Aprendizado Profundo com Redes Neurais Convolucionais (FIAP).
 
-# Ajuste visual para deixar o título em uma única linha e o layout mais fluido
-st.markdown("""
-    <style>
-    .block-container {
-        max-width: 860px;
-        padding-top: 2.5rem;
-    }
-    .titulo-linha-unica {
-        font-size: 1.75rem;
-        font-weight: 700;
-        white-space: nowrap;
-        margin-bottom: 0.4rem;
-    }
-    .subtitulo-fluido {
-        font-size: 0.98rem;
-        color: #4a4a4a;
-        margin-bottom: 1.8rem;
-    }
-    </style>
-""", unsafe_allow_html=True)
+**Integrantes da Equipe:**
+* Isabela Marques de Oliveira (RM: 567230)
+* Isabelle Ramos de Filippis (RM: 566783)
+* Samy Tamires de Sousa Cruz (RM: 566674)
 
-@st.cache_resource
-def carregar_modelo_e_preprocessador():
-    modelo = keras.models.load_model("modelo_mlp_sp.keras")
-    
-    # Categorias exatas extraídas do artefatos_web.pkl (ordem alfabética exata das 51 colunas One-Hot do treino)
-    bairros = [
-        'BARRA FUNDA', 'BELA VISTA', 'BOM RETIRO', 'BRÁS', 'CAPAO REDONDO',
-        'CENTRO', 'CENTRO HISTÓRICO DE SÃO PAULO', 'CONSOLACAO', 'CONSOLAÇÃO',
-        'IPIRANGA', 'ITAIM BIBI', 'ITAQUERA', 'JARDIM PAULISTA', 'LAPA',
-        'LIBERDADE', 'MOOCA', 'OUTROS BAIRROS', 'PINHEIROS', 'REPUBLICA',
-        'REPÚBLICA', 'SANTA CECILIA', 'SANTANA', 'SANTO AMARO', 'TATUAPÉ',
-        'VILA GUILHERME', 'VILA MARIANA'
-    ]
-    periodos = ['A NOITE', 'A TARDE', 'DE MADRUGADA', 'EM HORA INCERTA', 'PELA MANHÃ']
-    dias_treino = ['DOMINGO', 'QUARTA-FEIRA', 'QUINTA-FEIRA', 'SABADO', 'SEGUNDA-FEIRA', 'SEXTA-FEIRA', 'TERCA-FEIRA']
-    dias_exibicao = ['Segunda-feira', 'Terca-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sabado', 'Domingo']
-    tipos_local = [
-        'CENTRO COMERCIAL/EMPRESARIAL', 'COMÉRCIO E SERVIÇOS', 'ESTACIONAMENTO/GARAGEM',
-        'LAZER E RECREAÇÃO', 'OUTROS', 'OUTROS LOCAIS', 'RESIDÊNCIA',
-        'RESTAURANTE E AFINS', 'RODOVIA/ESTRADA', 'SAÚDE', 'SHOPPING CENTER',
-        'TERMINAL/ESTAÇÃO', 'VIA PÚBLICA'
-    ]
-    
-    features_categoricas = ['BAIRRO_AGRUPADO', 'PERIODO_DIA', 'DIA_SEMANA', 'TIPOLOCAL_AGRUPADO']
-    features_numericas = ['HORA_NUM', 'FIM_DE_SEMANA']
-    
-    # Reconstrói o OneHotEncoder exatamente com as 51 categorias do treino
-    ohe = OneHotEncoder(
-        categories=[bairros, periodos, dias_treino, tipos_local],
-        handle_unknown='ignore',
-        sparse_output=False
-    )
-    scaler = StandardScaler()
-    
-    preprocessador = ColumnTransformer(transformers=[
-        ('cat', ohe, features_categoricas),
-        ('num', scaler, features_numericas)
-    ])
-    
-    # Inicializa a estrutura do ColumnTransformer
-    df_init = pd.DataFrame([{
-        'BAIRRO_AGRUPADO': bairros[0],
-        'PERIODO_DIA': periodos[0],
-        'DIA_SEMANA': dias_treino[0],
-        'TIPOLOCAL_AGRUPADO': tipos_local[0],
-        'HORA_NUM': 14.0,
-        'FIM_DE_SEMANA': 0
-    }])
-    preprocessador.fit(df_init)
-    
-    # Injeta os parâmetros estatísticos exatos do conjunto de treino (12.600 amostras) extraídos do artefatos_web.pkl
-    scaler_ajustado = preprocessador.named_transformers_['num']
-    scaler_ajustado.mean_ = np.array([13.48936508, 0.28738095])
-    scaler_ajustado.var_ = np.array([37.79822937, 0.20479317])
-    scaler_ajustado.scale_ = np.array([6.14802646, 0.45254079])
-    scaler_ajustado.n_samples_seen_ = 12600
-    
-    return modelo, preprocessador, bairros, periodos, dias_exibicao, tipos_local
+**Aplicação rodando no Streamlit:** https://gs-mlp-seguranca-sp-qsit7kr2bcmqrtbddayvyi.streamlit.app/
 
-modelo, preprocessador, bairros, periodos, dias_semana, tipos_local = carregar_modelo_e_preprocessador()
+## 1. Sobre o projeto
+O objetivo aqui foi construir, treinar, avaliar e comparar três arquiteturas diferentes de redes neurais Multilayer Perceptron (MLP) para classificar ocorrências registradas na capital de São Paulo entre **Roubo (1)** e **Furto (0)**. 
 
-# Cabeçalho em linha única e texto logo abaixo seguindo o alinhamento
-st.markdown('<div class="titulo-linha-unica">🚓 Classificação Inteligente de Ocorrências em São Paulo (MLP)</div>', unsafe_allow_html=True)
-st.markdown(
-    '<div class="subtitulo-fluido">Esta aplicação utiliza uma rede neural <b>Multilayer Perceptron (MLP)</b> treinada com dados públicos da '
-    '<b>SSP-SP (Celulares Subtraídos - 2026)</b> para classificar se as características de uma ocorrência registrada na capital paulista são mais compatíveis com <b>Furto</b> ou <b>Roubo</b>.</div>',
-    unsafe_allow_html=True
-)
+Vale destacar que o modelo não prevê se um crime vai acontecer no futuro. Ele analisa as características de uma ocorrência (já registrada ou simulada no formulário) para indicar se o padrão daquele registro é mais compatível com roubo ou furto.
 
-with st.form("form_ocorrencia"):
-    st.subheader("Informe as características da ocorrência")
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        bairro = st.selectbox("Bairro da Ocorrência (SP Capital)", options=bairros)
-        periodo = st.selectbox("Período do Dia", options=periodos)
-        dia_semana = st.selectbox("Dia da Semana", options=dias_semana)
-        
-    with col2:
-        tipo_local = st.selectbox("Tipo de Local", options=tipos_local)
-        hora_num = st.slider("Hora Aproximada da Ocorrência (0h às 23h)", min_value=0, max_value=23, value=19)
-    
-    submetido = st.form_submit_button("🔍 Classificar Ocorrência", use_container_width=True)
+## 2. Base de dados e pré-processamento
+Os dados vieram da base pública de celulares subtraídos da Secretaria da Segurança Pública de São Paulo (SSP-SP), referente ao ano de 2026 (`CelularesSubtraidos_2026.xlsx`, aba `CELULAR_2026`), disponível no Portal de Estatísticas: https://www.ssp.sp.gov.br/estatistica/consultas.
 
-# Resultado da pesquisa aparece logo abaixo do formulário (e acima da nota do rodapé)
-if submetido:
-    fim_de_semana = 1 if str(dia_semana).upper() in ["SABADO", "DOMINGO", "SÁBADO"] else 0
-    
-    df_input = pd.DataFrame([{
-        "BAIRRO_AGRUPADO": bairro,
-        "PERIODO_DIA": periodo,
-        "DIA_SEMANA": str(dia_semana).upper(),
-        "TIPOLOCAL_AGRUPADO": tipo_local,
-        "HORA_NUM": float(hora_num),
-        "FIM_DE_SEMANA": int(fim_de_semana)
-    }])
-    
-    # Transforma gerando exatamente as 53 features alinhadas com a rede MLP
-    X_input_proc = preprocessador.transform(df_input)
-    
-    prob_roubo = float(modelo.predict(X_input_proc, verbose=0)[0][0])
-    prob_furto = 1.0 - prob_roubo
-    
-    classe_estimada = "ROUBO (Art. 157)" if prob_roubo >= 0.5 else "FURTO (Art. 155)"
-    
-    st.divider()
-    st.subheader(f"Resultado Estimado pela MLP: **{classe_estimada}**")
-    
-    c1, c2 = st.columns(2)
-    c1.metric("Probabilidade atribuída a ROUBO", f"{prob_roubo * 100:.1f}%")
-    c2.metric("Probabilidade atribuída a FURTO", f"{prob_furto * 100:.1f}%")
-    
-    st.progress(prob_roubo, text=f"Escala de Compatibilidade: Furto ({prob_furto*100:.1f}%) ➔ Roubo ({prob_roubo*100:.1f}%)")
-    st.caption(
-        f"**Interpretação correta:** Considerando que uma ocorrência aconteceu em **{bairro}** ({tipo_local}), "
-        f"na **{dia_semana}** ({periodo}, ~{hora_num}h), a rede MLP atribui **{prob_roubo*100:.1f}%** de probabilidade "
-        f"à classe Roubo e **{prob_furto*100:.1f}%** à classe Furto."
-    )
+* **Filtragem e limpeza:** Dos 256.076 registros originais, filtramos apenas os fatos ocorridos no município de São Paulo (`NOME_MUNICIPIO_CIRC`: 151.170 registros) e removemos boletins duplicados pela chave composta (`ANO_BO`, `NUM_BO`, `ID_DELEGACIA`), chegando a **130.851 ocorrências únicas**.
+* **Amostra e divisão:** Para viabilizar o treino, utilizamos um recorte estratificado de **18.000 registros** (65,04% de furto e 34,96% de roubo), divididos em **70% para treino** (12.600), **15% para validação** (2.700) e **15% para teste** (2.700).
+* **Features e prevenção de Data Leakage:** Utilizamos `BAIRRO_AGRUPADO`, `PERIODO_DIA`, `DIA_SEMANA`, `TIPOLOCAL_AGRUPADO`, `HORA_NUM` e `FIM_DE_SEMANA`. Após a imputação de dados ausentes, codificação categórica (*OneHotEncoding*) e escalonamento numérico (*StandardScaler*), a rede recebeu **53 features de entrada**. Colunas como `RUBRICA` e `DESC_LEI` foram excluídas das entradas para evitar vazamento de informação (*data leakage*).
 
-# Rodapé fixo no final da página (sempre abaixo dos resultados)
-st.write("")
-st.info("⚠️ **Nota metodológica:** O modelo analisa o perfil de uma ocorrência que já aconteceu (ou hipotética) e estima a compatibilidade com a natureza criminal (roubo vs. furto). Ele não prevê o risco de um crime futuro ocorrer.")
+## 3. Configuração do treinamento e resultados (Validação)
+O treinamento utilizou função de perda `binary_crossentropy`, otimizador `Adam` (`lr=0.001`), `batch_size=64`, limite de `50 épocas` com `EarlyStopping` (`patience=8`) e balanceamento de classes via `ClassWeight`.
+
+| Arquitetura | Camadas Ocultas | Ajustes | Acurácia | Precision | Recall | F1-Score |
+| :--- | :--- | :--- | :---: | :---: | :---: | :---: |
+| **Arquitetura 2 (Escolhida)** | 3 (128 - 64 - 32, ReLU) | EarlyStopping + ClassWeight | **69,04%** (0.6904) | 54,93% (0.5493) | 63,77% (0.6377) | **0.5902** |
+| **Arquitetura 1 (Baseline)** | 1 (32, ReLU) | EarlyStopping + ClassWeight | 68,41% (0.6841) | 54,02% (0.5402) | **64,72%** (0.6472) | 0.5889 |
+| **Arquitetura 3 (Regularizada)** | 2 (64 - 32, ReLU) | Dropout (0.3/0.2) + L2 + BatchNorm | 67,81% (0.6781) | **69,04%** (0.6904) | 14,41% (0.1441) | 0.2384 |
+
+### Desempenho Final no Conjunto de Teste
+A **Arquitetura 2 (Profunda 128-64-32)** atingiu o melhor equilíbrio de *F1-Score* na validação (evitando a queda severa de *Recall* observada na Configuração 3) e foi escolhida para integração na aplicação web. Avaliada no conjunto de teste isolado (2.700 amostras), obteve:
+* **Acurácia:** 69,81%
+* **Precision:** 56,04%
+* **Recall:** 63,35%
+* **F1-Score:** 0,5947
+
+## 4. Como rodar na sua máquina
+
+1. Instale as dependências:
+```bash
+pip install -r requirements.txt
+```
+
+2. Execute a aplicação no Streamlit:
+```bash
+streamlit run app.py
+```
